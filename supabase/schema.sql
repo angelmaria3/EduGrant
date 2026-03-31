@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS document (
   document_path       TEXT NOT NULL,
   verification_status VARCHAR(20) NOT NULL DEFAULT 'pending'
                       CHECK (verification_status IN ('pending','verified','rejected')),
+  remarks             TEXT,
   uploaded_at         TIMESTAMPTZ DEFAULT now()
 );
 

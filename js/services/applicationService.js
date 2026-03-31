@@ -56,13 +56,18 @@ export async function getPendingApplications() {
         .select(`
             *,
             student (name, register_number, department, cgpa, category, annual_income),
-            scholarship (scholarship_name, amount, is_percentage),
+            scholarship (scholarship_name, amount, is_percentage, external_url),
             document (*)
         `)
-        .in('status', ['submitted', 'under_verification'])
+        .in('status', ['submitted', 'under_verification', 'pending'])
         .order('application_date');
     if (error) throw error;
-    return data;
+
+    const readyApplications = data.filter(app => {
+        return !app.document.some(doc => doc.verification_status !== 'verified');
+    });
+
+    return readyApplications;
 }
 
 export async function getApplicationById(applicationId) {

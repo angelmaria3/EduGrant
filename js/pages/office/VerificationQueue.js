@@ -28,9 +28,19 @@ export async function VerificationQueue() {
             btn.addEventListener('click', async () => {
                 const docId  = btn.dataset.id;
                 const action = btn.dataset.action;
+                
+                let remarks = null;
+                if (action === 'rejected') {
+                    remarks = prompt('Enter a reason for rejection (e.g., "Income certificate unclear"):');
+                    if (remarks === null) return;
+                } else if (action === 'verified') {
+                    remarks = prompt('Enter an optional remark for verification (or leave empty):');
+                    if (remarks === null) return;
+                }
+
                 btn.disabled = true; btn.textContent = '…';
                 try {
-                    await updateDocumentStatus(docId, action);
+                    await updateDocumentStatus(docId, action, remarks);
                     const row = document.getElementById(`doc-${docId}`);
                     if (row) {
                         row.style.opacity = '0.4';

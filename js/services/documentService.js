@@ -45,10 +45,29 @@ export async function getAllPendingDocuments() {
     return data;
 }
 
-export async function updateDocumentStatus(documentId, status) {
+export async function getAllDocuments() {
+    const { data, error } = await supabase
+        .from('document')
+        .select(`
+            *,
+            application (
+                application_id, status,
+                scholarship (scholarship_name),
+                student (student_id, name, register_number, department)
+            )
+        `)
+        .order('uploaded_at', { ascending: false });
+    if (error) throw error;
+    return data;
+}
+
+export async function updateDocumentStatus(documentId, status, remarks = null) {
+    const payload = { verification_status: status };
+    if (remarks !== null) payload.remarks = remarks;
+
     const { error } = await supabase
         .from('document')
-        .update({ verification_status: status })
+        .update(payload)
         .eq('document_id', documentId);
     if (error) throw error;
 }
