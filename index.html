@@ -3,18 +3,32 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EduGrant | Scholarship & Fee Management</title>
+    <title>EduGrant | Scholarship &amp; Fee Management</title>
+    <meta name="description" content="EduGrant — Official portal for scholarship and fee concession applications, eligibility checks, and status tracking.">
     <link rel="stylesheet" href="css/styles.css">
-    <!-- Meta tags for SEO -->
-    <meta name="description" content="EduGrant - Official portal for scholarship and fee concession applications, eligibility checks, and status tracking.">
+
+    <!-- Supabase ESM via importmap (no build tool needed) -->
+    <script type="importmap">
+    {
+        "imports": {
+            "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2"
+        }
+    }
+    </script>
+    <script>
+        window.addEventListener('error', function(e) {
+            document.body.innerHTML += '<div style="color:red; background:white; padding:20px; z-index:9999; position:absolute; top:0; left:0; width:100%; word-wrap:break-word;"><b>JavaScript Error:</b><br>' + e.message + '<br><i>' + e.filename + ':' + e.lineno + '</i></div>';
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            document.body.innerHTML += '<div style="color:red; background:white; padding:20px; z-index:9999; position:absolute; top:0; left:0; width:100%; word-wrap:break-word;"><b>Promise Error:</b><br>' + e.reason + '</div>';
+        });
+    </script>
 </head>
 <body>
     <div id="root">
-        <!-- SPA content will be rendered here by router.js -->
+        <!-- SPA content rendered by router.js -->
     </div>
 
-    <!-- Application Scripts -->
-    <script type="module" src="js/store.js"></script>
     <script type="module" src="js/router.js"></script>
 </body>
 </html>

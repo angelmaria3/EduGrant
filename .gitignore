@@ -1,0 +1,11 @@
+# Supabase credentials — NEVER commit these
+js/config.js
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node (if ever added)
+node_modules/

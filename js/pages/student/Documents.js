@@ -1,117 +1,124 @@
 // js/pages/student/Documents.js
 import { store } from '../../store.js';
 import { Sidebar } from '../../components/Sidebar.js';
-import { Header } from '../../components/Header.js';
+import { Header }  from '../../components/Header.js';
+import { getMyApplications } from '../../services/applicationService.js';
+import { getDocumentsByApplication, uploadDocument, getSignedUrl } from '../../services/documentService.js';
+import { showToast } from '../../utils.js';
 
 export async function DocumentsPage() {
-    // Simulated document list if empty
-    if (store.documents.length === 0) {
-        store.documents = [
-            { id: 1, type: 'Income Certificate', file: 'income_cert.pdf', status: 'Verified', appId: 'APP-001' },
-            { id: 2, type: 'Caste Certificate', file: 'caste_cert.pdf', status: 'Pending', appId: 'APP-001' }
-        ];
+    const student = store.user.data;
+    if (!student) { window.location.hash = '#login'; return ''; }
+
+    const applications = await getMyApplications(student.student_id).catch(() => []);
+
+    const allDocs = [];
+    for (const app of applications) {
+        const docs = await getDocumentsByApplication(app.application_id).catch(() => []);
+        docs.forEach(d => allDocs.push({ ...d, appName: app.scholarship?.scholarship_name || 'Application', appId: app.application_id }));
     }
 
+    const statusColor = { verified: '#27AE60', pending: '#F39C12', rejected: '#C0392B' };
+    const statusIcon  = { verified: '✅', pending: '⏳', rejected: '❌' };
+
+    const docRows = allDocs.length === 0
+        ? '<p style="text-align:center;padding:32px;color:var(--text-secondary);">No documents uploaded yet.</p>'
+        : allDocs.map(doc => `
+            <div style="display:flex;align-items:center;gap:14px;padding:14px;border:1px solid var(--border);border-radius:10px;background:#fcfcfc;">
+                <span style="font-size:1.5rem;">📄</span>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:0.9rem;">${doc.document_type}</div>
+                    <div style="font-size:0.75rem;color:var(--text-secondary);">${doc.appName}</div>
+                </div>
+                <span style="font-size:0.8rem;font-weight:700;color:${statusColor[doc.verification_status] || '#666'};">
+                    ${statusIcon[doc.verification_status] || ''} ${doc.verification_status}
+                </span>
+                <button data-path="${doc.document_path}" class="view-doc-btn" style="background:var(--primary);color:white;padding:6px 12px;font-size:0.75rem;border-radius:6px;">View</button>
+            </div>
+        `).join('');
+
+    const appOptions = applications.map(a =>
+        `<option value="${a.application_id}">${a.scholarship?.scholarship_name || a.application_id}</option>`
+    ).join('');
+
     setTimeout(() => {
-        const uploadBtn = document.getElementById('upload-doc-btn');
-        uploadBtn?.addEventListener('click', (e) => {
+        document.querySelectorAll('.view-doc-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const path = btn.dataset.path;
+                btn.textContent = '…';
+                try {
+                    const url = await getSignedUrl(path);
+                    if (url) window.open(url, '_blank');
+                    else showToast('Could not generate link.', 'error');
+                } catch { showToast('Error fetching document.', 'error'); }
+                finally { btn.textContent = 'View'; }
+            });
+        });
+
+        document.getElementById('upload-form')?.addEventListener('submit', async e => {
             e.preventDefault();
-            const type = document.getElementById('doc-type').value;
-            const file = document.getElementById('doc-file').files[0];
-            
-            if (type && file) {
-                store.documents.push({
-                    id: Date.now(),
-                    type: type,
-                    file: file.name,
-                    status: 'Pending',
-                    appId: document.getElementById('app-filter').value
-                });
-                alert('Document uploaded successfully!');
-                window.location.hash = '#student/documents'; // Refresh
-            } else {
-                alert('Please select document type and file.');
-            }
+            const fd      = new FormData(e.target);
+            const appId   = fd.get('appId');
+            const docType = fd.get('docType');
+            const file    = fd.get('file');
+            const btn     = document.getElementById('upload-btn');
+            if (!file || file.size === 0) { showToast('Please select a file.', 'error'); return; }
+            if (file.size > 2 * 1024 * 1024) { showToast('File must be under 2MB.', 'error'); return; }
+            btn.disabled = true; btn.textContent = 'Uploading…';
+            try {
+                await uploadDocument(file, store.user.authUser.id, appId, docType);
+                showToast('Document uploaded!', 'success');
+                window.location.hash = '#student/documents';
+            } catch (err) {
+                showToast(err.message || 'Upload failed.', 'error');
+            } finally { btn.disabled = false; btn.textContent = 'Upload Document'; }
         });
     }, 0);
 
-    const applications = store.applications;
-
     return `
-        <div class="flex" style="min-height: 100vh;">
+        <div class="flex" style="min-height:100vh;">
             ${Sidebar()}
             <main class="main-content">
                 ${Header()}
                 <div class="page-container">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-lg);">
-                        <div>
-                            <h1 style="margin-bottom: 4px;">My Documents</h1>
-                            <p style="color: var(--text-secondary);">Manage supporting documents for your applications</p>
-                        </div>
-                        <div style="display: flex; gap: 12px; align-items: center;">
-                            <span style="font-size: 0.85rem; font-weight: 600;">Filter by App:</span>
-                            <select id="app-filter" style="width: 200px;">
-                                <option value="ALL">All Applications</option>
-                                ${applications.map(app => `<option value="${app.id}">${app.id} - ${app.scholarshipName}</option>`).join('')}
-                            </select>
-                        </div>
-                    </div>
+                    <h1 style="font-size:2rem;margin-bottom:8px;">My Documents</h1>
+                    <p style="color:var(--text-secondary);margin-bottom:32px;">Upload and track document verification</p>
 
-                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: var(--space-md);">
-                        <!-- Document List -->
+                    <div style="display:grid;grid-template-columns:2fr 1fr;gap:32px;align-items:start;">
                         <div class="card">
-                            <h3 style="font-size: 1.1rem; margin-bottom: var(--space-md);">Uploaded Documents</h3>
-                            <table style="width: 100%; border-collapse: collapse;">
-                                <thead>
-                                    <tr style="text-align: left; border-bottom: 1px solid var(--border);">
-                                        <th style="padding: 12px 8px; font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">Document Type</th>
-                                        <th style="padding: 12px 8px; font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">File</th>
-                                        <th style="padding: 12px 8px; font-weight: 600; font-size: 0.85rem; color: var(--text-secondary);">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="doc-table-body">
-                                    ${store.documents.map(doc => `
-                                        <tr style="border-bottom: 1px solid var(--border);">
-                                            <td style="padding: 12px 8px; font-weight: 600;">${doc.type}</td>
-                                            <td style="padding: 12px 8px; font-size: 0.85rem; color: var(--primary-light);">
-                                                <span style="cursor: pointer; text-decoration: underline;">${doc.file}</span>
-                                            </td>
-                                            <td style="padding: 12px 8px;">
-                                                <span style="background: ${doc.status === 'Verified' ? 'var(--success)' : 'var(--warning)'}20; color: ${doc.status === 'Verified' ? 'var(--success)' : 'var(--warning)'}; padding: 4px 10px; border-radius: var(--radius-pill); font-size: 0.75rem; font-weight: 700;">
-                                                    ${doc.status}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
+                            <h3 style="margin-bottom:20px;">Uploaded Documents</h3>
+                            <div style="display:flex;flex-direction:column;gap:10px;">${docRows}</div>
                         </div>
 
-                        <!-- Upload Widget -->
                         <div class="card">
-                            <h3 style="font-size: 1.1rem; margin-bottom: var(--space-md);">Upload New Document</h3>
-                            <form style="display: flex; flex-direction: column; gap: var(--space-md);">
-                                <div class="form-group">
-                                    <label>Document Type</label>
-                                    <select id="doc-type">
-                                        <option value="">Select Type</option>
-                                        <option>Income Certificate</option>
-                                        <option>Caste / Category Certificate</option>
-                                        <option>Academic Marksheet</option>
-                                        <option>Bonafide Certificate</option>
-                                        <option>Fee Receipt</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label>File (PDF, JPG, PNG ≤ 5MB)</label>
-                                    <div style="border: 2px dashed var(--border); border-radius: 8px; padding: var(--space-md); text-align: center; position: relative; cursor: pointer;">
-                                        <input type="file" id="doc-file" style="position: absolute; inset: 0; opacity: 0; cursor: pointer;">
-                                        <div style="font-size: 1.5rem; margin-bottom: 8px;">📁</div>
-                                        <div style="font-size: 0.85rem; color: var(--text-secondary);">Click or drag to upload</div>
+                            <h3 style="margin-bottom:20px;">Upload New</h3>
+                            ${applications.length === 0 ? `
+                                <p style="color:var(--text-secondary);font-size:0.9rem;">Apply first, then upload documents.</p>
+                                <button onclick="window.location.hash='#student/scholarships'" style="margin-top:12px;background:var(--primary);color:white;padding:10px;width:100%;font-weight:700;">Browse Scholarships</button>
+                            ` : `
+                                <form id="upload-form" style="display:flex;flex-direction:column;gap:16px;">
+                                    <div class="form-group">
+                                        <label>Application</label>
+                                        <select name="appId" required>${appOptions}</select>
                                     </div>
-                                </div>
-                                <button id="upload-doc-btn" style="background: var(--primary); color: white; padding: 12px;">Upload Document</button>
-                            </form>
+                                    <div class="form-group">
+                                        <label>Document Type</label>
+                                        <select name="docType" required>
+                                            <option value="income_cert">Income Certificate</option>
+                                            <option value="marksheet">Marksheet</option>
+                                            <option value="id_proof">ID Proof (Aadhaar)</option>
+                                            <option value="caste_cert">Caste Certificate</option>
+                                            <option value="bonafide">Bonafide Certificate</option>
+                                            <option value="bank_passbook">Bank Passbook</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>File (PDF/Image, max 2MB)</label>
+                                        <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required style="padding:6px;">
+                                    </div>
+                                    <button id="upload-btn" type="submit" style="background:var(--primary);color:white;padding:12px;font-weight:700;">Upload Document</button>
+                                </form>
+                            `}
                         </div>
                     </div>
                 </div>

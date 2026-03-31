@@ -3,8 +3,12 @@ import { store } from '../store.js';
 
 export function Header() {
     const role = store.user.role;
-    const hash = window.location.hash.substring(1) || 'dashboard';
-    const pageTitle = hash.split('/').pop().replace(/-/g, ' ').replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+    const hashParts = (window.location.hash.substring(1) || 'dashboard').split('/');
+    let rawTitle = hashParts.pop();
+    if (rawTitle.length === 36 && rawTitle.split('-').length === 5) {
+        rawTitle = hashParts.pop() || 'Details';
+    }
+    const pageTitle = rawTitle.replace(/-/g, ' ').replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
 
     return `
         <header class="header">
@@ -22,10 +26,7 @@ export function Header() {
                     </button>
                 ` : ''}
                 
-                <div class="notifications-bell" style="position: relative; width: 40px; height: 40px; background: #fff; border: 1px solid var(--border); border-radius: 12px; display: grid; place-items: center; cursor: pointer; transition: all 0.2s;">
-                    <span style="font-size: 1.2rem;">🔔</span>
-                    <span style="position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; background: var(--danger); border-radius: 50%; border: 2px solid white;"></span>
-                </div>
+
             </div>
         </header>
     `;

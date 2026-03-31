@@ -1,144 +1,162 @@
 // js/router.js
-import { store, login, logout } from './store.js';
-import { LoginPage } from './pages/Login.js';
-import { SignupPage } from './pages/Signup.js';
+import { store, initializeSession, clearSession } from './store.js';
+import { supabase } from './supabaseClient.js';
+import { signOut } from './services/authService.js';
+import { showToast } from './utils.js';
 
-// Student Portal Imports
-import { StudentDashboard } from './pages/student/Dashboard.js';
-import { ScholarshipsPage } from './pages/student/Scholarships.js';
-import { ApplicationForm } from './pages/student/ApplicationForm.js';
-import { DocumentsPage } from './pages/student/Documents.js';
-import { StatusTrackerPage } from './pages/student/StatusTracker.js';
-import { FeeDetailsPage } from './pages/student/FeeDetails.js';
-import { ProfilePage } from './pages/student/Profile.js';
+import { LoginPage }    from './pages/Login.js';
+import { SignupPage }   from './pages/Signup.js';
 
-// Office Staff Portal Imports
-import { StaffDashboard } from './pages/office/Dashboard.js';
-import { VerificationQueue } from './pages/office/VerificationQueue.js';
-import { OfficeDocuments } from './pages/office/Documents.js';
-import { StudentRecords } from './pages/office/StudentRecords.js';
-import { CGPAUpdates } from './pages/office/CGPAUpdates.js';
+// Student Portal
+import { StudentDashboard }   from './pages/student/Dashboard.js';
+import { ScholarshipsPage }   from './pages/student/Scholarships.js';
+import { ApplicationForm }    from './pages/student/ApplicationForm.js';
+import { DocumentsPage }      from './pages/student/Documents.js';
+import { StatusTrackerPage }  from './pages/student/StatusTracker.js';
+import { FeeDetailsPage }     from './pages/student/FeeDetails.js';
+import { ProfilePage }        from './pages/student/Profile.js';
+
+// Office Staff Portal
+import { StaffDashboard }     from './pages/office/Dashboard.js';
+import { VerificationQueue }  from './pages/office/VerificationQueue.js';
+import { OfficeDocuments }    from './pages/office/Documents.js';
+import { StudentRecords }     from './pages/office/StudentRecords.js';
+import { CGPAUpdates }        from './pages/office/CGPAUpdates.js';
 import { OfficeApplications } from './pages/office/Applications.js';
 
-// Admin Portal Imports
-import { AdminDashboard } from './pages/admin/Dashboard.js';
-import { AdminApplicationsPage } from './pages/admin/Applications.js';
-import { AdminReviewPanel } from './pages/admin/ReviewPanel.js';
+// Admin Portal
+import { AdminDashboard }         from './pages/admin/Dashboard.js';
+import { AdminApplicationsPage }  from './pages/admin/Applications.js';
+import { AdminReviewPanel }       from './pages/admin/ReviewPanel.js';
 import { EligibilityManagementPage as EligibilityCriteria } from './pages/admin/Eligibility.js';
-import { ReportsPage } from './pages/admin/Reports.js';
-import { StaffManagement } from './pages/admin/Staff.js';
+import { ReportsPage }            from './pages/admin/Reports.js';
+import { StaffManagement }        from './pages/admin/Staff.js';
 
 const routes = {
-    'login': LoginPage,
+    'login':  LoginPage,
     'signup': SignupPage,
-    
-    // Student Routes
-    'student/dashboard': StudentDashboard,
+
+    // Student
+    'student/dashboard':   StudentDashboard,
     'student/scholarships': ScholarshipsPage,
-    'student/apply/:id': ApplicationForm,
-    'student/documents': DocumentsPage,
+    'student/apply/:id':   ApplicationForm,
+    'student/documents':   DocumentsPage,
     'student/applications': StatusTrackerPage,
     'student/fee-details': FeeDetailsPage,
-    'student/profile': ProfilePage,
-    
-    // Staff Routes
-    'staff/dashboard': StaffDashboard,
-    'staff/queue': VerificationQueue,
-    'staff/documents': OfficeDocuments,
-    'staff/students': StudentRecords,
-    'staff/cgpa': CGPAUpdates,
+    'student/profile':     ProfilePage,
+
+    // Office Staff
+    'staff/dashboard':    StaffDashboard,
+    'staff/queue':        VerificationQueue,
+    'staff/documents':    OfficeDocuments,
+    'staff/students':     StudentRecords,
+    'staff/cgpa':         CGPAUpdates,
     'staff/applications': OfficeApplications,
 
-    // Admin Routes
-    'admin/dashboard': AdminDashboard,
-    'admin/applications': AdminApplicationsPage,
+    // Admin
+    'admin/dashboard':        AdminDashboard,
+    'admin/applications':     AdminApplicationsPage,
     'admin/applications/:id': AdminReviewPanel,
-    'admin/eligibility': EligibilityCriteria,
-    'admin/reports': ReportsPage,
-    'admin/staff': StaffManagement,
+    'admin/eligibility':      EligibilityCriteria,
+    'admin/reports':          ReportsPage,
+    'admin/staff':            StaffManagement,
 };
+
+const publicRoutes = ['login', 'signup'];
 
 export async function navigate() {
     const hash = window.location.hash.substring(1) || 'login';
     const root = document.getElementById('root');
-    
-    // Auth Guard & Store Rehydration
-    const savedRole = localStorage.getItem('user_role');
-    const publicRoutes = ['login', 'signup'];
-    
-    // Re-initialize store if needed (handle page refresh)
-    if (savedRole && !store.user.role) {
-        login(savedRole);
-    }
 
-    if (!publicRoutes.includes(hash) && !savedRole) {
+    // Show a loading state immediately
+    root.innerHTML = `<div style="display:grid;place-items:center;height:100vh;font-family:'Outfit';color:#5b0d1b;font-size:1.1rem;">Loading…</div>`;
+
+    // Rehydrate session (cached after first call per user)
+    const session = await initializeSession();
+
+    const isPublic = publicRoutes.some(r => hash === r);
+
+    // Not logged in → send to login
+    if (!session && !isPublic) {
         window.location.hash = '#login';
         return;
     }
 
-    // Role-based redirect if on login/signup but already logged in
-    if (publicRoutes.includes(hash) && savedRole) {
-        if (savedRole === 'student') window.location.hash = '#student/dashboard';
-        else if (savedRole === 'staff') window.location.hash = '#staff/dashboard';
-        else window.location.hash = '#admin/dashboard';
+    // Already logged in on login/signup → redirect to portal
+    if (session && isPublic) {
+        const role = store.user.role;
+        if (role === 'student')      window.location.hash = '#student/dashboard';
+        else if (role === 'office_staff') window.location.hash = '#staff/dashboard';
+        else                         window.location.hash = '#admin/dashboard';
         return;
     }
 
-    // Find route (support for dynamic :id)
-    let pageRenderer = null;
+    // Route-guard: prevent wrong role accessing wrong portal
+    if (session) {
+        const role = store.user.role;
+        if (hash.startsWith('student/') && role !== 'student') {
+            window.location.hash = role === 'admin' ? '#admin/dashboard' : '#staff/dashboard';
+            return;
+        }
+        if (hash.startsWith('staff/')   && role === 'student') { window.location.hash = '#student/dashboard'; return; }
+        if (hash.startsWith('admin/')   && role !== 'admin')   { window.location.hash = '#student/dashboard'; return; }
+    }
+
+    // Match route (supports dynamic :param segments)
+    let pageRenderer = LoginPage;
     let params = {};
 
     for (const route in routes) {
         const paramNames = [];
-        const routeRegexSource = route.replace(/:([^\s/]+)/g, (match, paramName) => {
-            paramNames.push(paramName);
+        const regexSrc = route.replace(/:([^\s/]+)/g, (_, name) => {
+            paramNames.push(name);
             return '([^/]+)';
         });
-        const routeRegex = new RegExp('^' + routeRegexSource + '$');
-        const match = hash.match(routeRegex);
-        
+        const match = hash.match(new RegExp('^' + regexSrc + '$'));
         if (match) {
             pageRenderer = routes[route];
-            paramNames.forEach((name, index) => {
-                params[name] = match[index + 1];
-            });
+            paramNames.forEach((name, i) => { params[name] = match[i + 1]; });
             break;
         }
     }
 
-    if (!pageRenderer) {
-        pageRenderer = LoginPage;
-    }
-    
-    if (pageRenderer) {
-        root.innerHTML = '';
+    // Render page
+    root.innerHTML = '';
+    try {
         const content = await pageRenderer(params);
         if (typeof content === 'string') {
             root.innerHTML = content;
-        } else {
+        } else if (content instanceof Node) {
             root.appendChild(content);
         }
-        setupEventListeners();
+    } catch (err) {
+        console.error('Page render error:', err);
+        root.innerHTML = `<div style="padding:40px;text-align:center;color:#C0392B;font-family:'Outfit';">
+            <div style="font-size:2rem;margin-bottom:12px;">⚠️</div>
+            <strong>Something went wrong.</strong><br>
+            <small style="color:#888;">${err.message}</small>
+        </div>`;
     }
+
+    setupEventListeners();
 }
 
 function setupEventListeners() {
-    document.querySelectorAll('[data-link]').forEach(link => {
-        link.addEventListener('click', (e) => {
-            e.preventDefault();
-            window.location.hash = e.target.getAttribute('href');
-        });
+    // Logout button
+    document.getElementById('logout-btn')?.addEventListener('click', async () => {
+        clearSession();
+        await signOut();
     });
 
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', logout);
-    }
+    // Sidebar data-link navigation
+    document.querySelectorAll('[data-link]').forEach(link => {
+        link.addEventListener('click', e => {
+            e.preventDefault();
+            window.location.hash = e.currentTarget.getAttribute('href');
+        });
+    });
 }
 
 window.addEventListener('hashchange', navigate);
-window.addEventListener('load', navigate);
-
-// Initial call to ensure render even if script loads after DOMContentLoaded
+// Single entry point on load
 navigate();
-

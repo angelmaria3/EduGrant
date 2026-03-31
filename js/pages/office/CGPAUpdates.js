@@ -1,81 +1,104 @@
 // js/pages/office/CGPAUpdates.js
-import { store, mockStudent } from '../../store.js';
+import { store } from '../../store.js';
 import { Sidebar } from '../../components/Sidebar.js';
-import { Header } from '../../components/Header.js';
+import { Header }  from '../../components/Header.js';
+import { getAllStudents, updateStudentCGPA } from '../../services/studentService.js';
+import { showToast } from '../../utils.js';
 
 export async function CGPAUpdates() {
+    if (!['office_staff','admin'].includes(store.user.role)) { window.location.hash = '#login'; return ''; }
+
+    const students = await getAllStudents().catch(() => []);
+
+    setTimeout(() => {
+        const searchEl = document.getElementById('cgpa-search');
+        const tbody    = document.getElementById('cgpa-tbody');
+
+        searchEl?.addEventListener('input', () => {
+            const q = searchEl.value.toLowerCase();
+            const filtered = students.filter(s =>
+                s.name?.toLowerCase().includes(q) ||
+                s.register_number?.toLowerCase().includes(q)
+            );
+            tbody.innerHTML = renderRows(filtered);
+            attachSaveHandlers();
+        });
+
+        attachSaveHandlers();
+    }, 0);
+
+    function attachSaveHandlers() {
+        document.querySelectorAll('.save-cgpa').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const studentId = btn.dataset.id;
+                const input     = document.getElementById(`cgpa-input-${studentId}`);
+                const newCgpa   = parseFloat(input.value);
+                if (isNaN(newCgpa) || newCgpa < 0 || newCgpa > 10) {
+                    showToast('CGPA must be between 0 and 10.', 'error');
+                    return;
+                }
+                btn.disabled = true; btn.textContent = 'Saving…';
+                try {
+                    await updateStudentCGPA(studentId, newCgpa);
+                    const display = document.getElementById(`cgpa-display-${studentId}`);
+                    if (display) display.textContent = newCgpa.toFixed(2);
+                    showToast('CGPA updated successfully!', 'success');
+                } catch (err) {
+                    showToast(err.message || 'Update failed.', 'error');
+                } finally { btn.disabled = false; btn.textContent = 'Save'; }
+            });
+        });
+    }
+
+    function renderRows(list) {
+        if (list.length === 0)
+            return `<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-secondary);">No matching students.</td></tr>`;
+        return list.map(s => `
+            <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:14px 12px;">
+                    <div style="font-weight:700;font-size:0.9rem;">${s.name || '—'}</div>
+                    <div style="font-size:0.72rem;color:var(--text-secondary);">${s.register_number}</div>
+                </td>
+                <td style="padding:14px 12px;font-size:0.85rem;">${s.department || '—'}</td>
+                <td style="padding:14px 12px;text-align:center;">Year ${s.year_study || '—'}</td>
+                <td style="padding:14px 12px;text-align:center;font-weight:700;color:${s.cgpa>=7.5?'var(--success)':s.cgpa>=5?'var(--warning)':'var(--danger)'};">
+                    <span id="cgpa-display-${s.student_id}">${s.cgpa ?? '—'}</span>
+                </td>
+                <td style="padding:14px 12px;">
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input id="cgpa-input-${s.student_id}" type="number" step="0.01" min="0" max="10" value="${s.cgpa ?? ''}" style="width:90px;padding:6px 10px;text-align:center;">
+                        <button class="save-cgpa" data-id="${s.student_id}" style="background:var(--primary);color:white;padding:7px 14px;font-size:0.8rem;border-radius:6px;font-weight:700;">Save</button>
+                    </div>
+                </td>
+            </tr>`).join('');
+    }
+
     return `
-        <div class="flex" style="min-height: 100vh;">
+        <div class="flex" style="min-height:100vh;">
             ${Sidebar()}
             <main class="main-content">
                 ${Header()}
                 <div class="page-container">
-                    
-                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 32px;">
-                        <!-- Update Queue -->
-                        <div class="card" style="padding: 0;">
-                            <div style="padding: 24px; border-bottom: 1px solid var(--border);">
-                                <h3 style="margin: 0; font-family: 'Outfit';">GPA Entry Queue</h3>
-                                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px;">Students awaiting latest semester GPA validation</p>
-                            </div>
-                            <table style="width: 100%; border-collapse: collapse;">
-                                <thead>
-                                    <tr style="text-align: left; background: #fafafa; border-bottom: 1px solid var(--border);">
-                                        <th style="padding: 16px; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 700;">Student</th>
-                                        <th style="padding: 16px; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 700;">Prev CGPA</th>
-                                        <th style="padding: 16px; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 700;">Target Sem</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr style="border-bottom: 1px solid var(--border); cursor: pointer; background: rgba(91, 13, 27, 0.02);">
-                                        <td style="padding: 16px;">
-                                            <div style="font-weight: 700;">Anjali R.</div>
-                                            <div style="font-size: 0.75rem; color: var(--text-secondary);">2021CS001</div>
-                                        </td>
-                                        <td style="padding: 16px;">8.48</td>
-                                        <td style="padding: 16px;">
-                                            <span class="badge" style="background: var(--primary-staff)15; color: var(--primary-staff);">Semester 5</span>
-                                        </td>
-                                    </tr>
-                                    <tr style="border-bottom: 1px solid var(--border);">
-                                        <td style="padding: 16px;">
-                                            <div style="font-weight: 700;">Rahul Krishnan</div>
-                                            <div style="font-size: 0.75rem; color: var(--text-secondary);">2022CS019</div>
-                                        </td>
-                                        <td style="padding: 16px;">7.80</td>
-                                        <td style="padding: 16px;">
-                                            <span class="badge" style="background: var(--primary-staff)15; color: var(--primary-staff);">Semester 3</span>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                    <div style="margin-bottom:28px;display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <h1 style="font-size:2rem;margin:0;">CGPA Updates</h1>
+                            <p style="color:var(--text-secondary);margin-top:4px;">Update student academic records after semester results</p>
                         </div>
-
-                        <!-- Quick Update Form -->
-                        <div class="card" style="align-self: flex-start;">
-                            <h3 style="margin-bottom: 24px; font-family: 'Outfit';">Update Record</h3>
-                            <div style="display: flex; flex-direction: column; gap: 20px;">
-                                <div class="form-group">
-                                    <label>Selected Student</label>
-                                    <div style="font-weight: 700;">Anjali R. (2021CS001)</div>
-                                </div>
-                                <div class="form-group">
-                                    <label>Enter Semester 5 GPA</label>
-                                    <input type="number" step="0.01" placeholder="e.g. 8.5" style="border: 2px solid var(--primary-staff);">
-                                </div>
-                                <div class="form-group">
-                                    <label>Verification Markshet (Uploaded)</label>
-                                    <div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: #f5f5f5; border-radius: 8px; font-size: 0.8rem;">
-                                        <span>📄</span>
-                                        <span style="flex: 1;">marksheet_s5.pdf</span>
-                                        <span style="color: var(--primary-staff); font-weight: 700;">View</span>
-                                    </div>
-                                </div>
-                                <button style="background: var(--primary-staff); color: white; padding: 14px; font-weight: 700; width: 100%;">Commit Entry</button>
-                            </div>
-                        </div>
+                        <input id="cgpa-search" type="text" placeholder="🔍 Search student…" style="min-width:240px;padding:10px 14px;">
                     </div>
 
+                    <div class="card" style="padding:0;overflow:hidden;">
+                        <table style="width:100%;border-collapse:collapse;">
+                            <thead><tr style="background:var(--neutral-bg);">
+                                <th style="padding:14px 12px;text-align:left;font-size:0.78rem;color:var(--text-secondary);text-transform:uppercase;">Student</th>
+                                <th style="padding:14px 12px;text-align:left;font-size:0.78rem;color:var(--text-secondary);text-transform:uppercase;">Dept</th>
+                                <th style="padding:14px 12px;text-align:center;font-size:0.78rem;color:var(--text-secondary);text-transform:uppercase;">Year</th>
+                                <th style="padding:14px 12px;text-align:center;font-size:0.78rem;color:var(--text-secondary);text-transform:uppercase;">Current CGPA</th>
+                                <th style="padding:14px 12px;text-align:left;font-size:0.78rem;color:var(--text-secondary);text-transform:uppercase;">Update</th>
+                            </tr></thead>
+                            <tbody id="cgpa-tbody">${renderRows(students)}</tbody>
+                        </table>
+                    </div>
                 </div>
             </main>
         </div>
