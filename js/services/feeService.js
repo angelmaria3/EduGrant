@@ -60,3 +60,15 @@ export async function updateFeePayment(studentId, paidAmount, year) {
         .eq('academic_year', year);
     if (error) throw error;
 }
+
+export async function getGlobalFeeStructure(semester, year) {
+    const { data, error } = await supabase
+        .from('global_fee_structure')
+        .select('*')
+        .eq('semester', semester)
+        .eq('academic_year', year)
+        .single();
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
+}
+

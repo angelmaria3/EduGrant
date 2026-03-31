@@ -20,11 +20,7 @@ export function Header() {
             </div>
             
             <div class="header-right" style="margin-left: auto; display: flex; align-items: center; gap: 16px;">
-                ${role === 'admin' ? `
-                    <button style="background: rgba(91, 13, 27, 0.05); color: var(--primary-student); padding: 8px 16px; font-size: 0.85rem; border: 1px dashed var(--primary-student);">
-                        + New Scheme
-                    </button>
-                ` : ''}
+                <!-- Header Right Action Area -->
                 
 
             </div>

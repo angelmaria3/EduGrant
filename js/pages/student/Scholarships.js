@@ -74,7 +74,7 @@ export async function ScholarshipsPage() {
                     <div style="display:flex;gap:32px;">
                         <div>
                             <div style="font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;font-weight:700;">Amount</div>
-                            <div style="font-weight:700;color:var(--primary);">₹${Number(s.amount).toLocaleString()}/year</div>
+                            <div style="font-weight:700;color:var(--primary);">${s.is_percentage ? `${s.amount}%` : `₹${Number(s.amount).toLocaleString()}/year`}</div>
                         </div>
                         <div>
                             <div style="font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;font-weight:700;">Year</div>

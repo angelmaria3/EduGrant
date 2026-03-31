@@ -53,7 +53,7 @@ export function SignupPage() {
                     phone:                fd.get('phone')?.trim() || null,
                     department:           fd.get('dept').trim(),
                     year_study:           parseInt(fd.get('yearStudy')) || 1,
-                    
+                    current_semester:     parseInt(fd.get('current_semester')) || 1,
                     category:             fd.get('category'),
                     cgpa:                 parseFloat(fd.get('cgpa')) || 0,
                     annual_income:        parseFloat(fd.get('income')) || 0,
@@ -138,6 +138,11 @@ export function SignupPage() {
                         <div class="form-group"><label>Department *</label><input type="text" name="dept" placeholder="e.g. Computer Science" required></div>
                         <div class="form-group"><label>Year of Study *</label>
                             <select name="yearStudy" required><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select>
+                        </div>
+                        <div class="form-group"><label>Current Semester *</label>
+                            <select name="current_semester" required>
+                                ${[1,2,3,4,5,6,7,8].map(s => `<option value="${s}">Semester ${s}</option>`).join('')}
+                            </select>
                         </div>
                         <div class="form-group"><label>Admission Type *</label>
                             <select name="admission_type" required><option value="">Select…</option><option value="Merit">Govt Merit Quota</option><option value="Management">Management Quota</option><option value="NRI">NRI Quota</option></select>

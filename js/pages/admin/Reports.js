@@ -4,17 +4,38 @@ import { Sidebar } from '../../components/Sidebar.js';
 import { Header }  from '../../components/Header.js';
 import { getAllApplications } from '../../services/applicationService.js';
 import { getAllStudents } from '../../services/studentService.js';
+import { supabase } from '../../supabaseClient.js';
 
 export async function ReportsPage() {
     if (store.user.role !== 'admin') { window.location.hash = '#admin/dashboard'; return ''; }
 
-    const [applications, students] = await Promise.all([
+    const [applications, students, { data: globalFees = [] }] = await Promise.all([
         getAllApplications().catch(() => []),
-        getAllStudents().catch(() => [])
+        getAllStudents().catch(() => []),
+        supabase.from('global_fee_structure').select('*')
     ]);
 
     const approved = applications.filter(a => a.status === 'approved');
-    const totalGranted = approved.reduce((sum, a) => sum + Number(a.scholarship?.amount || 0), 0);
+    
+    let totalGranted = 0;
+    approved.forEach(a => {
+        const sch = a.scholarship;
+        if (sch && (sch.type === 'fee_concession' || sch.is_percentage)) {
+            // Find student for their semester
+            const student = students.find(s => s.student_id === a.student_id);
+            const sem = student?.current_semester || 1;
+            
+            // Find tuition fee for that semester
+            const feeRow = globalFees.find(f => f.semester === sem);
+            const tuition = parseFloat(feeRow?.tuition_fee || 3500);
+
+            if (sch.is_percentage) {
+                totalGranted += (tuition * (parseFloat(sch.amount) / 100));
+            } else {
+                totalGranted += parseFloat(sch.amount);
+            }
+        }
+    });
 
     const deptStats = {};
     students.forEach(s => {
@@ -47,7 +68,7 @@ export async function ReportsPage() {
                             { label:'Total Students',    value: students.length,          color:'var(--primary)' },
                             { label:'Total Applications',value: applications.length,       color:'#1A3C6E' },
                             { label:'Approved',          value: approved.length,           color:'var(--success)' },
-                            { label:'Total Granted',     value:`₹${totalGranted.toLocaleString()}`, color:'#8E44AD' }
+                            { label:'Institution Fee Relief', value:`₹${Math.round(totalGranted).toLocaleString()}`, color:'#8E44AD' }
                         ].map(s=>`
                             <div class="card stat-card" style="border-top:4px solid ${s.color};">
                                 <span class="text-overline">${s.label}</span>

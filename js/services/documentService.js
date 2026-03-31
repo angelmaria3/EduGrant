@@ -36,6 +36,7 @@ export async function getAllPendingDocuments() {
             *,
             application (
                 application_id, status,
+                scholarship (scholarship_name),
                 student (name, register_number, department)
             )
         `)

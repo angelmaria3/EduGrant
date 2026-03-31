@@ -2,96 +2,123 @@
 import { store } from '../../store.js';
 import { Sidebar } from '../../components/Sidebar.js';
 import { Header }  from '../../components/Header.js';
-import { getStudentFee } from '../../services/feeService.js';
+import { getGlobalFeeStructure } from '../../services/feeService.js';
+import { getMyApplications }     from '../../services/applicationService.js';
 
 export async function FeeDetailsPage() {
     const student = store.user.data;
     if (!student) { window.location.hash = '#login'; return ''; }
 
-    const fee = await getStudentFee(student.student_id).catch(() => null);
+    const year = new Date().getFullYear();
+    const sem  = student.current_semester || 1;
 
-    const statusColor = { paid: '#27AE60', partial: '#E67E22', unpaid: '#C0392B' };
-    const statusLabel = { paid: '✅ Fully Paid', partial: '⚠️ Partially Paid', unpaid: '❌ Unpaid' };
+    // 1. Get Global Structure for current semester
+    const structure = await getGlobalFeeStructure(sem, year);
+    
+    // 2. Get Approved Fee Concessions
+    const apps = await getMyApplications(student.student_id).catch(() => []);
+    const concessions = apps.filter(a => a.status === 'approved' && a.scholarship?.type === 'fee_concession');
 
-    const noFeeHtml = `
-        <div class="card" style="text-align:center;padding:60px;color:var(--text-secondary);">
-            <div style="font-size:3rem;margin-bottom:16px;">💳</div>
-            <h3>No fee record found</h3>
-            <p>Your fee record for ${new Date().getFullYear()} has not been created yet. Contact the office.</p>
-        </div>`;
+    // 3. Calculate Tuition Discount
+    let tuitionOriginal = parseFloat(structure?.tuition_fee || 0);
+    let totalDiscount = 0;
+    
+    concessions.forEach(c => {
+        const sch = c.scholarship;
+        if (sch.is_percentage) {
+            totalDiscount += tuitionOriginal * (parseFloat(sch.amount) / 100);
+        } else {
+            totalDiscount += parseFloat(sch.amount);
+        }
+    });
 
-    const feeHtml = fee ? (() => {
-        const total   = Number(fee.total_fee);
-        const paid    = Number(fee.paid_amount);
-        const pending = Number(fee.pending_amount);
-        const pct     = total > 0 ? Math.min((paid / total) * 100, 100) : 0;
-        const sc      = statusColor[fee.payment_status] || '#5F6368';
+    const tuitionFinal = Math.max(0, tuitionOriginal - totalDiscount);
 
-        return `
-            <!-- Overview -->
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;margin-bottom:32px;">
-                ${[
-                    { label:'Total Fee',    value:`₹${total.toLocaleString()}`,   color:'var(--primary)' },
-                    { label:'Amount Paid',  value:`₹${paid.toLocaleString()}`,    color:'var(--success)' },
-                    { label:'Pending',      value:`₹${pending.toLocaleString()}`, color:'var(--danger)'  },
-                    { label:'Status',       value: statusLabel[fee.payment_status] || fee.payment_status, color: sc }
-                ].map(s => `
-                    <div class="card stat-card" style="border-top:4px solid ${s.color};">
-                        <span class="text-overline">${s.label}</span>
-                        <div style="font-size:1.5rem;font-weight:700;color:${s.color};margin-top:4px;">${s.value}</div>
-                    </div>
-                `).join('')}
-            </div>
+    const components = [
+        { label: 'Tuition Fee',      original: tuitionOriginal, final: tuitionFinal, isConcession: totalDiscount > 0 },
+        { label: 'Examination Fee',  original: parseFloat(structure?.exam_fee || 0), final: parseFloat(structure?.exam_fee || 0) },
+        { label: 'University Fee',   original: parseFloat(structure?.university_fee || 0), final: parseFloat(structure?.university_fee || 0) },
+        { label: 'Bus Fee',          original: parseFloat(structure?.bus_fee || 0), final: parseFloat(structure?.bus_fee || 0) },
+        { label: 'Arts & Sports Fee',original: parseFloat(structure?.arts_sports_fee || 0), final: parseFloat(structure?.arts_sports_fee || 0) },
+        { label: 'Miscellaneous Fee',original: parseFloat(structure?.misc_fee || 0), final: parseFloat(structure?.misc_fee || 0) },
+    ];
 
-            <!-- Progress -->
-            <div class="card" style="margin-bottom:24px;">
-                <h3 style="margin-bottom:20px;">Payment Progress</h3>
-                <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:8px;">
-                    <span style="color:var(--text-secondary);">₹0</span>
-                    <span style="font-weight:700;color:var(--success);">₹${paid.toLocaleString()} paid (${pct.toFixed(1)}%)</span>
-                    <span style="color:var(--text-secondary);">₹${total.toLocaleString()}</span>
-                </div>
-                <div class="progress-bar-container" style="height:16px;border-radius:8px;">
-                    <div class="progress-bar-fill" style="width:${pct}%;background:${pct===100?'var(--success)':'var(--primary)'};height:16px;border-radius:8px;transition:width 1s ease;"></div>
-                </div>
-                <div style="margin-top:16px;padding:12px 16px;background:${sc}15;border:1px solid ${sc}30;border-radius:8px;font-size:0.9rem;font-weight:600;color:${sc};">
-                    ${statusLabel[fee.payment_status] || fee.payment_status} — Academic Year ${fee.academic_year}
-                </div>
-            </div>
+    const grandTotalOriginal = components.reduce((sum, c) => sum + c.original, 0);
+    const grandTotalFinal    = components.reduce((sum, c) => sum + c.final, 0);
 
-            <!-- Info -->
-            <div class="card">
-                <h3 style="margin-bottom:16px;">Fee Breakdown</h3>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:0.9rem;">
-                    <div style="padding:12px;background:var(--neutral-bg);border-radius:8px;">
-                        <div style="color:var(--text-secondary);font-size:0.78rem;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Academic Year</div>
-                        <div style="font-weight:700;">${fee.academic_year}</div>
-                    </div>
-                    <div style="padding:12px;background:var(--neutral-bg);border-radius:8px;">
-                        <div style="color:var(--text-secondary);font-size:0.78rem;font-weight:700;text-transform:uppercase;margin-bottom:4px;">Last Updated</div>
-                        <div style="font-weight:700;">${new Date(fee.updated_at).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</div>
-                    </div>
-                </div>
-                <div style="margin-top:16px;padding:14px;background:rgba(39,174,96,0.08);border:1px solid rgba(39,174,96,0.2);border-radius:8px;font-size:0.85rem;color:#1a6b3a;">
-                    <strong>Note:</strong> Scholarship approvals automatically reduce your pending fee amount.
-                    <a href="#student/scholarships" style="color:var(--primary);font-weight:700;"> Apply now →</a>
-                </div>
-            </div>`;
-    })() : noFeeHtml;
+    const tableRows = components.map(c => `
+        <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 16px; font-weight: 500;">${c.label}</td>
+            <td style="padding: 16px; text-align: right; color: var(--text-secondary); ${c.isConcession ? 'text-decoration: line-through; font-size: 0.8rem;' : ''}">₹${c.original.toLocaleString()}</td>
+            <td style="padding: 16px; text-align: right; font-weight: 700; color: ${c.isConcession ? 'var(--success)' : 'var(--text-primary)'}">₹${c.final.toLocaleString()}</td>
+        </tr>
+    `).join('');
 
     return `
-        <div class="flex" style="min-height:100vh;">
+        <div class="flex" style="min-height: 100vh;">
             ${Sidebar()}
             <main class="main-content">
                 ${Header()}
-                <div class="page-container">
-                    <div style="margin-bottom:32px;">
-                        <h1 style="font-size:2rem;margin:0;">Fee Details</h1>
-                        <p style="color:var(--text-secondary);margin-top:4px;">Your fee status for Academic Year ${new Date().getFullYear()}</p>
+                <div class="page-container" style="width: 100% !important; max-width: none !important; margin: 0 !important;">
+                    <div style="margin-bottom: 32px; display: flex; justify-content: space-between; align-items: flex-end;">
+                        <div>
+                            <h1 style="font-size: 2rem; margin: 0;">Fee Structure</h1>
+                            <p style="color: var(--text-secondary); margin-top: 4px;">Detailed breakdown for <strong>Semester ${sem}</strong></p>
+                        </div>
+                        <div style="background: var(--neutral-bg); padding: 8px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 700; color: var(--primary);">
+                            AY ${year}
+                        </div>
                     </div>
-                    ${feeHtml}
+
+                    <div class="card" style="padding: 0; overflow: hidden; margin-bottom: 32px;">
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: var(--neutral-bg); border-bottom: 2px solid var(--border);">
+                                    <th style="padding: 16px; text-align: left; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary);">Fee Component</th>
+                                    <th style="padding: 16px; text-align: right; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary);">Original Amount</th>
+                                    <th style="padding: 16px; text-align: right; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary);">Payable Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${tableRows}
+                                <tr style="background: var(--neutral-bg); border-top: 2px solid var(--border);">
+                                    <td style="padding: 20px 16px; font-weight: 800; font-size: 1.1rem;">Total (Semester ${sem})</td>
+                                    <td style="padding: 20px 16px; text-align: right; font-weight: 700; color: var(--text-secondary); ${totalDiscount > 0 ? 'text-decoration: line-through;' : ''}">₹${grandTotalOriginal.toLocaleString()}</td>
+                                    <td style="padding: 20px 16px; text-align: right; font-weight: 900; font-size: 1.2rem; color: var(--primary);">₹${grandTotalFinal.toLocaleString()}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    ${concessions.length > 0 ? `
+                        <div style="display: flex; flex-direction: column; gap: 12px; padding: 20px; background: rgba(39, 174, 96, 0.08); border: 1px solid rgba(39, 174, 96, 0.2); border-radius: 12px; color: #1a6b3a;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <span style="font-size: 1.5rem;">✨</span>
+                                <div style="font-weight: 800; font-size: 1rem;">Scholarship Concessions Applied</div>
+                            </div>
+                            <ul style="margin: 0; padding-left: 20px; font-size: 0.9rem;">
+                                ${concessions.map(c => `
+                                    <li style="margin-bottom: 4px;">
+                                        <strong>${c.scholarship.scholarship_name}</strong>: 
+                                        ${c.scholarship.is_percentage ? `${c.scholarship.amount}% concession` : `₹${parseFloat(c.scholarship.amount).toLocaleString()} discount`} 
+                                        (Saved ₹${(c.scholarship.is_percentage ? (tuitionOriginal * parseFloat(c.scholarship.amount)/100) : parseFloat(c.scholarship.amount)).toLocaleString()})
+                                    </li>
+                                `).join('')}
+                            </ul>
+                            <div style="margin-top: 8px; font-weight: 700; border-top: 1px solid rgba(39,174,96,0.2); padding-top: 8px;">
+                                Total Savings: ₹${totalDiscount.toLocaleString()}
+                            </div>
+                        </div>
+                    ` : `
+                        <div style="padding: 20px; background: var(--neutral-bg); border-radius: 12px; border: 1px solid var(--border); color: var(--text-secondary); font-size: 0.9rem;">
+                            <strong>No concessions applied yet.</strong> If you're eligible for fee-waiver scholarships, apply in the <a href="#student/scholarships" style="color: var(--primary); font-weight: 700; text-decoration: none;">Scholarships section</a>.
+                        </div>
+                    `}
+
+                    </div>
                 </div>
             </main>
         </div>
     `;
 }
+

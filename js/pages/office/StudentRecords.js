@@ -18,7 +18,8 @@ export async function StudentRecords() {
             const filtered = students.filter(s =>
                 s.name?.toLowerCase().includes(q) ||
                 s.register_number?.toLowerCase().includes(q) ||
-                s.department?.toLowerCase().includes(q)
+                s.department?.toLowerCase().includes(q) ||
+                `year ${s.year_study}`.toLowerCase().includes(q)
             );
             tbody.innerHTML = renderRows(filtered);
         });
@@ -53,7 +54,7 @@ export async function StudentRecords() {
                             <h1 style="font-size:2rem;margin:0;">Student Records</h1>
                             <p style="color:var(--text-secondary);margin-top:4px;">${students.length} registered students</p>
                         </div>
-                        <input id="student-search" type="text" placeholder="🔍 Search by name, reg no, dept…" style="min-width:260px;padding:10px 14px;">
+                        <input id="student-search" type="text" placeholder="🔍 Search by name, dept, year..." style="min-width:320px;padding:10px 14px;border-radius:12px;border:1px solid var(--border);outline:none;background:white;">
                     </div>
 
                     <div class="card" style="padding:0;overflow:hidden;">

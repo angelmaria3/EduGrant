@@ -21,6 +21,7 @@ export async function ProfilePage() {
                 phone:                fd.get('phone').trim() || null,
                 department:           fd.get('department').trim(),
                 year_study:           parseInt(fd.get('year_study')),
+                current_semester:     parseInt(fd.get('current_semester')),
                 category:             fd.get('category'),
                 cgpa:                 parseFloat(fd.get('cgpa')) || 0,
                 annual_income:        parseFloat(fd.get('annual_income')) || 0,
@@ -136,6 +137,11 @@ export async function ProfilePage() {
                                         <div class="form-group"><label>Year of Study</label>
                                             <select name="year_study" required>
                                                 ${[1,2,3,4].map(y=>`<option value="${y}" ${s.year_study==y?'selected':''}>Year ${y}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                        <div class="form-group"><label>Current Semester</label>
+                                            <select name="current_semester" required>
+                                                ${[1,2,3,4,5,6,7,8].map(sem=>`<option value="${sem}" ${s.current_semester==sem?'selected':''}>Semester ${sem}</option>`).join('')}
                                             </select>
                                         </div>
                                         <div class="form-group"><label>Current CGPA</label><input type="number" name="cgpa" step="0.01" min="0" max="10" value="${s.cgpa || ''}" required></div>

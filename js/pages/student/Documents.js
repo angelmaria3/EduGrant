@@ -5,6 +5,7 @@ import { Header }  from '../../components/Header.js';
 import { getMyApplications } from '../../services/applicationService.js';
 import { getDocumentsByApplication, uploadDocument, getSignedUrl } from '../../services/documentService.js';
 import { showToast } from '../../utils.js';
+import { navigate } from '../../router.js';
 
 export async function DocumentsPage() {
     const student = store.user.data;
@@ -68,7 +69,8 @@ export async function DocumentsPage() {
             try {
                 await uploadDocument(file, store.user.authUser.id, appId, docType);
                 showToast('Document uploaded!', 'success');
-                window.location.hash = '#student/documents';
+                e.target.reset();
+                navigate();
             } catch (err) {
                 showToast(err.message || 'Upload failed.', 'error');
             } finally { btn.disabled = false; btn.textContent = 'Upload Document'; }

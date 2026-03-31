@@ -5,7 +5,7 @@ let myAppsCache = {};
 
 export async function submitApplication(studentId, scholarshipId, externalApplicationId = null) {
     const year = new Date().getFullYear();
-    const payload = { student_id: studentId, scholarship_id: scholarshipId, year, status: 'pending' };
+    const payload = { student_id: studentId, scholarship_id: scholarshipId, year, status: 'submitted' };
     if (externalApplicationId) {
         payload.external_application_id = externalApplicationId;
     }
@@ -63,11 +63,7 @@ export async function getPendingApplications() {
         .order('application_date');
     if (error) throw error;
 
-    const readyApplications = data.filter(app => {
-        return !app.document.some(doc => doc.verification_status !== 'verified');
-    });
-
-    return readyApplications;
+    return data;
 }
 
 export async function getApplicationById(applicationId) {
@@ -104,33 +100,53 @@ export async function updateApplicationStatus(applicationId, status, remarks, ad
             .single();
 
         const year = new Date().getFullYear();
-        const { data: fee } = await supabase
-            .from('fee_details')
-            .select('total_fee, paid_amount')
+        
+        // 1. Get student current semester
+        const { data: student } = await supabase
+            .from('student')
+            .select('current_semester')
             .eq('student_id', app.student_id)
+            .single();
+
+        // 2. Get global fee structure for that semester
+        const { data: globalFee } = await supabase
+            .from('global_fee_structure')
+            .select('tuition_fee')
+            .eq('semester', student.current_semester || 1)
             .eq('academic_year', year)
             .single();
 
-        if (fee && sch) {
+        if (globalFee && sch) {
             let amountToCredit = parseFloat(sch.amount);
 
-            // Dynamically calculate fee concession (e.g. 50% waiver -> applies 50% of the total_fee toward paid_amount)
+            // Calculation based specifically on Tuition Fee component
             if (sch.is_percentage) {
-                amountToCredit = parseFloat(fee.total_fee) * (amountToCredit / 100.0);
+                amountToCredit = parseFloat(globalFee.tuition_fee) * (amountToCredit / 100.0);
             }
 
-            const newPaid = parseFloat(fee.paid_amount) + amountToCredit;
-            const payStatus = newPaid >= fee.total_fee ? 'paid' : 'partial';
-
-            await supabase
+            // Update individual fee_details record for overall payment tracking
+            const { data: fee } = await supabase
                 .from('fee_details')
-                .update({ 
-                    paid_amount: newPaid, 
-                    payment_status: payStatus, 
-                    updated_at: new Date().toISOString() 
-                })
+                .select('paid_amount, total_fee')
                 .eq('student_id', app.student_id)
-                .eq('academic_year', year);
+                .eq('academic_year', year)
+                .single();
+
+            if (fee) {
+                const newPaid = parseFloat(fee.paid_amount) + amountToCredit;
+                const payStatus = newPaid >= fee.total_fee ? 'paid' : 'partial';
+
+                await supabase
+                    .from('fee_details')
+                    .update({ 
+                        paid_amount: newPaid, 
+                        payment_status: payStatus, 
+                        updated_at: new Date().toISOString() 
+                    })
+                    .eq('student_id', app.student_id)
+                    .eq('academic_year', year);
+            }
         }
     }
 }
+

@@ -34,10 +34,10 @@ export function Sidebar() {
     } else if (role === 'admin') {
         menuItems = [
             { label: 'Admin Dashboard', icon: '📊', hash: 'admin/dashboard' },
-            { label: 'Review Panel', icon: '⚖️', hash: 'admin/review' },
-            { label: 'All Applications', icon: '📋', hash: 'admin/applications' },
+            { label: 'Review Applications', icon: '📋', hash: 'admin/applications' },
             { label: 'Eligibility Builder', icon: '✅', hash: 'admin/eligibility' },
             { label: 'Staff & Roles', icon: '👥', hash: 'admin/staff' },
+            { label: 'Fee Management', icon: '💳', hash: 'admin/fees' },
             { label: 'Reports', icon: '📈', hash: 'admin/reports' }
         ];
     }

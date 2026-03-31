@@ -4,6 +4,7 @@ import { Sidebar } from '../../components/Sidebar.js';
 import { Header }  from '../../components/Header.js';
 import { getAllScholarships, createScholarship, createEligibilityCriteria, deleteScholarship } from '../../services/scholarshipService.js';
 import { showToast } from '../../utils.js';
+import { navigate } from '../../router.js';
 
 export async function EligibilityManagementPage() {
     if (store.user.role !== 'admin') { window.location.hash = '#admin/dashboard'; return ''; }
@@ -66,7 +67,7 @@ export async function EligibilityManagementPage() {
                 try {
                     await deleteScholarship(btn.dataset.id);
                     showToast('Deleted.', 'success');
-                    window.location.hash = '#admin/eligibility';
+                    navigate();
                 } catch (err) { showToast(err.message, 'error'); btn.disabled = false; }
             });
         });
@@ -81,11 +82,11 @@ export async function EligibilityManagementPage() {
                 const isPct = type === 'fee_concession';
                 
                 const sch = await createScholarship({
-                    scholarship_name: fd.get('scholarship_name').trim(),
-                    description:      fd.get('description').trim(),
-                    amount:           parseFloat(fd.get('amount')),
+                    scholarship_name: fd.get('scholarship_name')?.trim() || '',
+                    description:      fd.get('description')?.trim() || '',
+                    amount:           parseFloat(fd.get('amount')) || 0,
                     is_percentage:    isPct,
-                    provider:         fd.get('provider').trim(),
+                    provider:         fd.get('provider')?.trim() || '',
                     type:             type,
                     applicable_year:  parseInt(fd.get('applicable_year'))
                 });
@@ -108,7 +109,7 @@ export async function EligibilityManagementPage() {
                     req_crisis:           fd.get('req_crisis') === 'on'
                 });
                 showToast('Scheme generated with rules.', 'success');
-                window.location.hash = '#admin/eligibility';
+                navigate();
             } catch (err) { showToast(err.message || 'Failed.', 'error'); }
             finally { btn.disabled = false; btn.textContent = '+ Create New Scheme'; }
         });

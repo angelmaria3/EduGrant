@@ -31,6 +31,7 @@ import { AdminReviewPanel }       from './pages/admin/ReviewPanel.js';
 import { EligibilityManagementPage as EligibilityCriteria } from './pages/admin/Eligibility.js';
 import { ReportsPage }            from './pages/admin/Reports.js';
 import { StaffManagement }        from './pages/admin/Staff.js';
+import { FeeManagement }          from './pages/admin/FeeManagement.js';
 
 const routes = {
     'login':  LoginPage,
@@ -60,6 +61,7 @@ const routes = {
     'admin/eligibility':      EligibilityCriteria,
     'admin/reports':          ReportsPage,
     'admin/staff':            StaffManagement,
+    'admin/fees':             FeeManagement,
 };
 
 const publicRoutes = ['login', 'signup'];
