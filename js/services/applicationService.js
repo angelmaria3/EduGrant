@@ -1,18 +1,27 @@
 // js/services/applicationService.js
 import { supabase } from '../supabaseClient.js';
 
-export async function submitApplication(studentId, scholarshipId) {
+let myAppsCache = {};
+
+export async function submitApplication(studentId, scholarshipId, externalApplicationId = null) {
     const year = new Date().getFullYear();
+    const payload = { student_id: studentId, scholarship_id: scholarshipId, year, status: 'pending' };
+    if (externalApplicationId) {
+        payload.external_application_id = externalApplicationId;
+    }
     const { data, error } = await supabase
         .from('application')
-        .insert({ student_id: studentId, scholarship_id: scholarshipId, year, status: 'submitted' })
+        .insert(payload)
         .select()
         .single();
     if (error) throw error;
+    delete myAppsCache[studentId]; // bust cache
     return data;
 }
 
 export async function getMyApplications(studentId) {
+    if (myAppsCache[studentId]) return myAppsCache[studentId];
+
     const { data, error } = await supabase
         .from('application')
         .select(`
@@ -23,6 +32,8 @@ export async function getMyApplications(studentId) {
         .eq('student_id', studentId)
         .order('application_date', { ascending: false });
     if (error) throw error;
+    
+    myAppsCache[studentId] = data;
     return data;
 }
 

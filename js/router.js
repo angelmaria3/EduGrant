@@ -68,8 +68,6 @@ export async function navigate() {
     const hash = window.location.hash.substring(1) || 'login';
     const root = document.getElementById('root');
 
-    // Show a loading state immediately
-    root.innerHTML = `<div style="display:grid;place-items:center;height:100vh;font-family:'Outfit';color:#5b0d1b;font-size:1.1rem;">Loading…</div>`;
 
     // Rehydrate session (cached after first call per user)
     const session = await initializeSession();

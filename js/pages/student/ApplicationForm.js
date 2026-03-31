@@ -21,6 +21,7 @@ export async function ApplicationForm(params) {
     }
 
     let currentStep = 1;
+    let savedExternalId = '';
 
     function renderStep(step) {
         switch (step) {
@@ -52,7 +53,16 @@ export async function ApplicationForm(params) {
                         <div><strong>Type:</strong> ${scholarship.type}</div>
                         <div><strong>Year:</strong> ${scholarship.applicable_year}</div>
                     </div>
-                </div>`;
+                </div>
+                ${scholarship.external_url ? `
+                <div class="card" style="margin-top:16px;border:1px solid var(--warning);background:rgba(243,156,18,0.05);">
+                    <h4 style="margin-bottom:8px;color:#b45309;">External Application Required</h4>
+                    <p style="font-size:0.9rem;margin-bottom:12px;color:var(--text-secondary);">You must have already applied on the external portal. Please provide your application ID below.</p>
+                    <div class="form-group">
+                        <label>External Application ID*</label>
+                        <input type="text" id="f-external-id" value="${savedExternalId}" placeholder="Enter your application ID from the external portal" required>
+                    </div>
+                </div>` : ''}`;
             case 4: return `
                 <div style="padding:var(--space-md);text-align:center;">
                     <div style="font-size:3rem;margin-bottom:var(--space-md);">📜</div>
@@ -85,6 +95,15 @@ export async function ApplicationForm(params) {
         }
 
         nextBtn.addEventListener('click', async () => {
+            if (currentStep === 3 && scholarship.external_url) {
+                const inputVal = document.getElementById('f-external-id')?.value?.trim();
+                if (!inputVal) {
+                    showToast('Please enter your External Application ID.', 'error');
+                    return;
+                }
+                savedExternalId = inputVal;
+            }
+
             if (currentStep < 4) {
                 currentStep++;
                 updateUI();
@@ -96,7 +115,7 @@ export async function ApplicationForm(params) {
                 nextBtn.disabled = true;
                 nextBtn.textContent = 'Submitting…';
                 try {
-                    await submitApplication(student.student_id, scholarshipId);
+                    await submitApplication(student.student_id, scholarshipId, savedExternalId);
                     showToast('Application submitted successfully! 🎉', 'success');
                     window.location.hash = '#student/applications';
                 } catch (err) {

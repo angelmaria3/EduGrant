@@ -43,9 +43,16 @@ export async function ScholarshipsPage() {
                 <div style="color:${getStatusColor(app?.status || 'pending')};font-weight:700;text-align:center;margin-bottom:8px;">● Already Applied</div>
                 <span class="badge" style="display:block;text-align:center;background:${getStatusColor(app?.status)}20;color:${getStatusColor(app?.status)};">${app?.status || 'pending'}</span>`;
         } else if (eligible) {
-            actionHtml = `
-                <div style="color:var(--success);font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;">✅ Eligible</div>
-                <button onclick="window.location.hash='#student/apply/${s.scholarship_id}'" style="width:100%;background:var(--primary);color:white;padding:10px;border-radius:8px;font-weight:700;">Apply Now →</button>`;
+            if (s.external_url) {
+                actionHtml = `
+                    <div style="color:var(--success);font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;">✅ Eligible</div>
+                    <button onclick="window.open('${s.external_url}', '_blank')" style="width:100%;background:var(--primary);color:white;padding:10px;border-radius:8px;font-weight:700;margin-bottom:8px;">Apply Externally ↗</button>
+                    <button onclick="window.location.hash='#student/apply/${s.scholarship_id}'" style="width:100%;background:var(--success);color:white;padding:10px;border-radius:8px;font-weight:700;">Submit to Institution →</button>`;
+            } else {
+                actionHtml = `
+                    <div style="color:var(--success);font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;">✅ Eligible</div>
+                    <button onclick="window.location.hash='#student/apply/${s.scholarship_id}'" style="width:100%;background:var(--primary);color:white;padding:10px;border-radius:8px;font-weight:700;">Apply Internally →</button>`;
+            }
         } else {
             actionHtml = `
                 <div style="color:var(--danger);font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:8px;">❌ Not Eligible</div>

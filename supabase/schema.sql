@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS scholarship (
   type             VARCHAR(30)   NOT NULL
                    CHECK (type IN ('merit','need','category_based','fee_concession','disability_based','gender_based','religion_based')),
   applicable_year  INTEGER       NOT NULL,
+  external_url     TEXT,
   created_at       TIMESTAMPTZ   DEFAULT now()
 );
 
@@ -92,15 +93,17 @@ CREATE TABLE IF NOT EXISTS eligibility_criteria (
 );
 
 CREATE TABLE IF NOT EXISTS application (
-  application_id   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  student_id       UUID REFERENCES student(student_id) ON DELETE CASCADE,
-  scholarship_id   UUID REFERENCES scholarship(scholarship_id),
-  admin_id         UUID REFERENCES admin(admin_id),
-  application_date TIMESTAMPTZ DEFAULT now(),
-  year             INTEGER NOT NULL,
-  status           VARCHAR(20) NOT NULL DEFAULT 'pending'
-                   CHECK (status IN ('pending','approved','rejected')),
-  remarks          TEXT,
+  application_id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  student_id              UUID REFERENCES student(student_id) ON DELETE CASCADE,
+  scholarship_id          UUID REFERENCES scholarship(scholarship_id),
+  admin_id                UUID REFERENCES admin(admin_id),
+  application_date        TIMESTAMPTZ DEFAULT now(),
+  year                    INTEGER NOT NULL,
+  status                  VARCHAR(20) NOT NULL DEFAULT 'pending'
+                          CHECK (status IN ('pending','approved','rejected')),
+  remarks                 TEXT,
+  external_application_id VARCHAR(255),
+  external_portal_name    VARCHAR(150),
   UNIQUE (student_id, scholarship_id, year)
 );
 
@@ -243,14 +246,14 @@ DECLARE
 BEGIN
 
 -- SCHOLARSHIPS (Fixed Amount)
-INSERT INTO scholarship (scholarship_id, scholarship_name, description, amount, is_percentage, provider, type, applicable_year) VALUES
-  (v_Central, '1. Central Sector Scholarship', 'Merit+Income: 12th >80%, Income <8L, UG/PG', 10000, false, 'Central Govt', 'merit', yr),
-  (v_Pragati, '2. AICTE Pragati Scholarship', 'Girls in technical degree, Income <8L', 50000, false, 'AICTE', 'gender_based', yr),
-  (v_Saksham, '3. AICTE Saksham Scholarship', 'Disability >=40%, Technical course, Income <8L', 50000, false, 'AICTE', 'disability_based', yr),
-  (v_PostMat, '4. Post Matric (SC/ST/OBC)', 'SC/ST/OBC, Income <2.5L, UG/PG', 25000, false, 'Govt', 'category_based', yr),
-  (v_MinMC,   '5. Merit-cum-Means (Minority)', 'Minority religions, Marks >=50%, Income <2L', 30000, false, 'Govt', 'religion_based', yr),
-  (v_Inspire, '6. INSPIRE Scholarship', 'Science stream, 12th Marks >95%, UG Science', 80000, false, 'DST', 'merit', yr),
-  (v_Kerala,  '7. Kerala Higher Education', 'Kerala domicile, Income <2L', 15000, false, 'Kerala Govt', 'need', yr);
+INSERT INTO scholarship (scholarship_id, scholarship_name, description, amount, is_percentage, provider, type, applicable_year, external_url) VALUES
+  (v_Central, '1. Central Sector Scholarship', 'Merit+Income: 12th >80%, Income <8L, UG/PG', 10000, false, 'Central Govt', 'merit', yr, 'https://scholarships.gov.in/'),
+  (v_Pragati, '2. AICTE Pragati Scholarship', 'Girls in technical degree, Income <8L', 50000, false, 'AICTE', 'gender_based', yr, 'https://scholarships.gov.in/'),
+  (v_Saksham, '3. AICTE Saksham Scholarship', 'Disability >=40%, Technical course, Income <8L', 50000, false, 'AICTE', 'disability_based', yr, 'https://www.aicte.gov.in/schemes/students-development-schemes/Pragati/General-Instructions'),
+  (v_PostMat, '4. Post Matric (SC/ST/OBC)', 'SC/ST/OBC, Income <2.5L, UG/PG', 25000, false, 'Govt', 'category_based', yr, 'https://scholarships.gov.in/'),
+  (v_MinMC,   '5. Merit-cum-Means (Minority)', 'Minority religions, Marks >=50%, Income <2L', 30000, false, 'Govt', 'religion_based', yr, 'https://scholarships.gov.in/'),
+  (v_Inspire, '6. INSPIRE Scholarship', 'Science stream, 12th Marks >95%, UG Science', 80000, false, 'DST', 'merit', yr, 'https://online-inspire.gov.in/'),
+  (v_Kerala,  '7. Kerala Higher Education', 'Kerala domicile, Income <2L', 15000, false, 'Kerala Govt', 'need', yr, 'https://scholarship.kshec.kerala.gov.in/');
 
 INSERT INTO eligibility_criteria (scholarship_id, min_cgpa, max_income, min_marks_12, req_course_level, req_gender, req_course_type, min_disability, eligible_category, req_religion, req_state) VALUES
   (v_Central, 8.00, 800000, 80.00, 'UG,PG', NULL, NULL, 0, NULL, NULL, NULL),
@@ -263,14 +266,14 @@ INSERT INTO eligibility_criteria (scholarship_id, min_cgpa, max_income, min_mark
 
 
 -- FEE CONCESSIONS (Percentage Based Amount)
-INSERT INTO scholarship (scholarship_id, scholarship_name, description, amount, is_percentage, provider, type, applicable_year) VALUES
-  (v_TFW,     'C1. Tuition Fee Waiver (TFW)', '100% Waiver for merit admission with TFW seat, Income <8L', 100, true, 'AICTE', 'fee_concession', yr),
-  (v_Egrantz, 'C2. E-Grantz Scheme', '100% Waiver for SC/ST/OEC, Income <6L', 100, true, 'Kerala Govt', 'fee_concession', yr),
-  (v_KtU_PM,  'C3. State Post Matric', 'Tuition reimbursement for SC/ST/OBC, Income <2.5L', 80, true, 'Govt', 'fee_concession', yr),
-  (v_EWS,     'C4. EWS Concession', 'Partial reduction for General EWS, Income <8L', 25, true, 'Govt', 'fee_concession', yr),
-  (v_MinCon,  'C5. Minority Fee Concession', 'Professional courses, Minority, Income <2L', 50, true, 'Govt', 'fee_concession', yr),
-  (v_ColMerit,'C6. College Merit Concession', '75% reduction for 12th Marks >90%', 75, true, 'Institution', 'merit', yr),
-  (v_ColSport,'C7. Sports Quota Waiver', '50% reduction for State/National players', 50, true, 'Institution', 'merit', yr);
+INSERT INTO scholarship (scholarship_id, scholarship_name, description, amount, is_percentage, provider, type, applicable_year, external_url) VALUES
+  (v_TFW,     'C1. Tuition Fee Waiver (TFW)', '100% Waiver for merit admission with TFW seat, Income <8L', 100, true, 'AICTE', 'fee_concession', yr, NULL),
+  (v_Egrantz, 'C2. E-Grantz Scheme', '100% Waiver for SC/ST/OEC, Income <6L', 100, true, 'Kerala Govt', 'fee_concession', yr, 'https://egrantz.kerala.gov.in/'),
+  (v_KtU_PM,  'C3. State Post Matric', 'Tuition reimbursement for SC/ST/OBC, Income <2.5L', 80, true, 'Govt', 'fee_concession', yr, 'https://egrantz.kerala.gov.in/'),
+  (v_EWS,     'C4. EWS Concession', 'Partial reduction for General EWS, Income <8L', 25, true, 'Govt', 'fee_concession', yr, NULL),
+  (v_MinCon,  'C5. Minority Fee Concession', 'Professional courses, Minority, Income <2L', 50, true, 'Govt', 'fee_concession', yr, NULL),
+  (v_ColMerit,'C6. College Merit Concession', '75% reduction for 12th Marks >90%', 75, true, 'Institution', 'merit', yr, NULL),
+  (v_ColSport,'C7. Sports Quota Waiver', '50% reduction for State/National players', 50, true, 'Institution', 'merit', yr, NULL);
 
 INSERT INTO eligibility_criteria (scholarship_id, min_cgpa, max_income, req_admission_type, req_tfw, eligible_category, req_religion, min_marks_12, req_sports) VALUES
   (v_TFW,     0.00, 800000, 'Merit', true, NULL, NULL, 0, NULL),

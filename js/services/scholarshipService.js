@@ -1,12 +1,18 @@
 // js/services/scholarshipService.js
 import { supabase } from '../supabaseClient.js';
 
+let scholarshipsCache = null;
+
 export async function getAllScholarships() {
+    if (scholarshipsCache) return scholarshipsCache;
+
     const { data, error } = await supabase
         .from('scholarship')
         .select(`*, eligibility_criteria(*)`)
         .order('scholarship_name');
     if (error) throw error;
+    
+    scholarshipsCache = data;
     return data;
 }
 
