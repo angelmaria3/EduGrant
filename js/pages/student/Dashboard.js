@@ -34,8 +34,16 @@ export async function StudentDashboard() {
 
     setTimeout(() => {
         // Realtime subscription for application status changes
+        const channelName = `student-app-updates-${student.student_id}`;
+        
+        // Clean up any existing channel with this name to avoid "callbacks after subscribe" error
+        const existingChannel = supabase.getChannels().find(c => c.name === channelName);
+        if (existingChannel) {
+            supabase.removeChannel(existingChannel);
+        }
+
         const channel = supabase
-            .channel('student-app-updates')
+            .channel(channelName)
             .on('postgres_changes', {
                 event: 'UPDATE', schema: 'public', table: 'application',
                 filter: `student_id=eq.${student.student_id}`
